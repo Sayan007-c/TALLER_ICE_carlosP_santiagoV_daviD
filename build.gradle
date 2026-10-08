@@ -1,0 +1,50 @@
+plugins {
+    id 'com.zeroc.slice-tools' version '3.8.3' apply false
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'com.zeroc.slice-tools'
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        implementation 'com.zeroc:ice:3.8.3'
+    }
+
+    tasks.register('syncSlice') {
+        doLast {
+            def sliceDir = file("$projectDir/src/main/slice")
+            sliceDir.mkdirs()
+            copy {
+                from "$rootDir/slice"
+                into sliceDir
+                include "*.ice"
+            }
+        }
+    }
+
+    tasks.named('compileSliceMain') {
+        dependsOn 'syncSlice'
+    }
+}
+
+tasks.register('runServer', JavaExec) {
+    group = 'application'
+    description = 'Inicia el servidor ZeroC Ice'
+    dependsOn ':Server:classes'
+    classpath = project(':Server').sourceSets.main.runtimeClasspath
+    mainClass = 'server.Server'
+    standardInput = System.in
+}
+
+tasks.register('runClient', JavaExec) {
+    group = 'application'
+    description = 'Inicia el cliente interactivo'
+    dependsOn ':Client:classes'
+    classpath = project(':Client').sourceSets.main.runtimeClasspath
+    mainClass = 'client.Client'
+    standardInput = System.in
+}
