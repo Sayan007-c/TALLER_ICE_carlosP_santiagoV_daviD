@@ -1,5 +1,0 @@
-C:\Users\SANTIAGO\.gradle\native\slice-tools-3.8.3\bin/slice2java.exe
--I
-C:\Users\SANTIAGO\.gradle\native\slice-tools-3.8.3\slice
---output-dir
-C:\Users\SANTIAGO\OneDrive - Universidad Icesi\Documentos\Taller ICE\TALLER_ICE_carlosP_santiagoV_daviD\Client\build\generated\source\slice\main
