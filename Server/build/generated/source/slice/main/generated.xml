@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<generated>
+  <source name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\src\main\slice\Chat.ice">
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/ChatException.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/NicknameInUseException.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/UserNotFoundException.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/RoomNotFoundException.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/RoomAlreadyExistsException.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/InvalidOperationException.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/FileChunk.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/VoiceMember.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/VoiceMemberListHelper.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/ClientCallbackPrx.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/_ClientCallbackPrxI.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/ChatServerPrx.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/_ChatServerPrxI.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/ClientCallback.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/ChatServer.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/AsyncClientCallback.java"/>
+    <file name="C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main/ChatApp/AsyncChatServer.java"/>
+  </source>
+</generated>

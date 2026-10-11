@@ -1,0 +1,5 @@
+C:\Users\mrtak\.gradle\native\slice-tools-3.8.3\bin/slice2java.exe
+-I
+C:\Users\mrtak\.gradle\native\slice-tools-3.8.3\slice
+--output-dir
+C:\Users\mrtak\OneDrive\Documentos\TALLER_ICE_carlosP_santiagoV_daviD\Server\build\generated\source\slice\main
