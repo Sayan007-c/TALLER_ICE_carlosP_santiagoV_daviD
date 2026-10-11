@@ -1,0 +1,11 @@
+
+# Archivos temporales de Gradle
+.gradle/
+**/build/
+
+# Configuracion local de IntelliJ
+.idea/
+*.iml
+
+# Archivos compilados
+*.class
