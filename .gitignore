@@ -7,5 +7,6 @@
 .idea/
 *.iml
 
-# Archivos compilados
+# Archivos compilados y descargas locales
 *.class
+downloads/

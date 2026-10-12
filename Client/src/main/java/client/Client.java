@@ -20,6 +20,7 @@ public class Client {
 
         private static ChatServerPrx server;
         private static volatile VoiceController voice;
+        private static final FileTransferManager fileManager = new FileTransferManager();
 
         public static void main(String[] args) {
 
@@ -108,7 +109,7 @@ public class Client {
 
                         ClientCallbackI callbackImpl =
                                 new ClientCallbackI(
-                                        currentNickname, voice);
+                                        currentNickname, voice, fileManager);
 
                         String identityName =
                                 "ClientCallback-"
@@ -293,14 +294,43 @@ public class Client {
                         }
                         break;
 
-                    // RF-04: Archivos.
+                    // RF-04: Transferencia de archivos multimedia (Chunking).
                     case "/sendfile":
 
-                        // Pendiente de integracion con
-                        // el modulo del Integrante 2.
-                        System.out.println(
-                                "[INFO] Transferencia de archivos "
-                                        + "pendiente de integracion");
+                        if (parts.length < 3) {
+                            System.out.println(
+                                    "[USO] /sendfile <usuario|#sala> <ruta_archivo>");
+                        } else {
+                            String target = parts[1].trim();
+                            String filePath = parts[2].trim();
+
+                            // Eliminar comillas envolventes si el usuario copió la ruta con comillas
+                            if ((filePath.startsWith("\"") && filePath.endsWith("\""))
+                                    || (filePath.startsWith("'") && filePath.endsWith("'"))) {
+                                filePath = filePath.substring(1, filePath.length() - 1).trim();
+                            }
+
+                            boolean isRoom = target.startsWith("#");
+                            if (isRoom) {
+                                target = target.substring(1);
+                            } else if (target.startsWith("@")) {
+                                target = target.substring(1);
+                            } else {
+                                // Comprobar si coincide con alguna sala activa
+                                try {
+                                    for (String r : server.listRooms()) {
+                                        if (r.equalsIgnoreCase(target)) {
+                                            isRoom = true;
+                                            break;
+                                        }
+                                    }
+                                } catch (Exception ignored) {
+                                }
+                            }
+
+                            fileManager.sendFileAsync(
+                                    server, currentNickname, target, filePath, isRoom);
+                        }
                         break;
 
                     // RF-05: Iniciar llamada individual.

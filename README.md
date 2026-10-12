@@ -1,124 +1,166 @@
 # Taller Evaluativo Unidad 2: Sistemas Distribuidos, Middleware y Comunicación Multimedia
 **Curso:** Computación en Internet I (09810 - TIC)  
 **Semestre:** 2026-2 | Universidad Icesi  
-**Integrantes:**
-- Carlos Pasinga
-- Santiago Vinazco
-- David
+**Modalidad:** Grupos de 3 a 4 Estudiantes  
+
+### Integrantes:
+- **Carlos Pasinga** — A00412446
+- **Santiago Vinazco** — 
+- **David** —  
 
 ---
 
 ## 1. Arquitectura General del Sistema
 
-El sistema implementa una arquitectura híbrida cliente-servidor para mensajería y llamadas en tiempo real:
+El sistema implementa una arquitectura distribuida e híbrida diseñada para desacoplar el control transaccional del flujo multimedia de alta tasa:
+
 1. **Canal de Control, Mensajería y Transferencia de Archivos (ZeroC Ice / TCP):**
-   - Utiliza RPC fuertemente tipado mediante el contrato `Chat.ice`.
-   - Garantiza entrega confiable, callbacks asíncronos y orden estricto de paquetes.
-2. **Canal de Audio en Tiempo Real (Sockets UDP crudos):**
-   - Emplea `java.net.DatagramSocket` y `javax.sound.sampled` para baja latencia acústica sin sobrecarga de confirmaciones (ACKs).
+   - **Protocolo:** TCP con RPC fuertemente tipado definido en el contrato Slice (`Chat.ice`).
+   - **Garantías:** Tipado estricto, entrega confiable ordenada (sin pérdida de paquetes ni corrupción) y despacho asíncrono bidireccional mediante objetos callback de retorno (`ClientCallback`).
+   - **Transferencia Multimedia (RF-04):** Fragmentación en memoria (chunking de 64 KB) mediante secuencias binarias `sequence<byte>` para respetar el límite de buffer de Ice (`Ice.MessageSizeMax`), reconstruyendo los archivos byte a byte en disco en la carpeta `downloads/`.
+
+2. **Canal de Audio en Tiempo Real (Sockets Datagrama UDP Crudos):**
+   - **Protocolo:** UDP punto a punto con `java.net.DatagramSocket` y la API `javax.sound.sampled`.
+   - **Garantías:** Mínima latencia acústica y fluidez de voz sin incurrir en la sobrecarga de confirmaciones (ACKs), retransmisiones ni bloqueo de cabeza de línea (Head-of-Line Blocking) característicos de TCP.
+   - **Topología Grupal Seleccionada (RF-06):** **Malla Peer-to-Peer (Mesh)**, donde cada cliente replica sus paquetes UDP directamente a los demás participantes de la sala de voz, descargando por completo de tráfico de audio a la red del servidor.
+
+### Diagrama de Arquitectura y Flujos de Red
 
 ```
-                      +-----------------------------+
-                      |      ZeroC Ice Server       |
-                      |   (Puerto TCP 10000 / RPC)  |
-                      |    + Audio Relay UDP SFU    |
-                      +--------------+--------------+
-                                     ^
-           TCP (Señalización /       |       TCP (Señalización /
-           Mensajería / Chunks)      |       Mensajería / Chunks) 
-                                     v
-                 +-------------------+-------------------+
-                 |                                       |
-    +------------+-----------+               +-----------+-----------+
-    |   Cliente 1 (Ice)      | <--- UDP ---> |   Cliente 2 (Ice)     |
-    | Callback: Puerto local |  (Voz 1 a 1)  | Callback: Puerto local|
-    +------------------------+               +-----------------------+
+                          +------------------------------------------+
+                          |             ZeroC Ice Server             |
+                          |        Servant: ChatServerI              |
+                          |       (Puerto TCP 10000 / RPC)           |
+                          +--------------------+---------------------+
+                                               ^
+                      TCP: Señalización /      |      TCP: Señalización /
+                      Mensajería / Chunks      |      Mensajería / Chunks
+                      de Archivos (64 KB)      |      de Archivos (64 KB)
+                                               v
+                     +-------------------------+-------------------------+
+                     |                                                   |
+        +------------+-------------+                        +------------+-------------+
+        |     Cliente 1 (Ice)      |                        |     Cliente 2 (Ice)      |
+        |  Callback: Puerto efímero|                        |  Callback: Puerto efímero|
+        |  Audio: DatagramSocket   | <====================> |  Audio: DatagramSocket   |
+        +--------------------------+    Flujo Audio UDP     +--------------------------+
+                     \                  (DatagramPacket)                 /
+                      \                 16 kHz PCM Mono                 /
+                       \                                               /
+                        \                                             /
+                         \                                           /
+                          \               +-------------------------+
+                           \              |     Cliente 3 (Ice)     |
+                            ============> |  Callback: Puerto efímero|
+                              Audio UDP   |  Audio: DatagramSocket  |
+                              (Mesh P2P)  +-------------------------+
 ```
 
-## . Instrucciones de Ejecución
+---
 
-El proyecto está configurado con **Gradle 9** y el plugin oficial de Ice `com.zeroc.slice-tools`.
+## 2. Instrucciones de Compilación y Ejecución
+
+El proyecto está organizado como una arquitectura multimodular en **Gradle** gestionada con el plugin oficial `com.zeroc.slice-tools`.
+
+> **Requisito de Entorno:** Se recomienda ejecutar sobre **Java 17 o Java 21 (LTS)**.
+
+### Compilar el Proyecto:
+```bash
+./gradlew compileJava
+```
 
 ### Iniciar el Servidor:
 ```bash
 ./gradlew runServer
 ```
-*(Escucha por defecto en el puerto `10000`)*
+*(El servidor se iniciará escuchando por defecto en el puerto TCP `10000`)*
 
-### Iniciar Clientes:
+### Iniciar Clientes Interactivos:
+En terminales independientes, ejecutar:
 ```bash
 ./gradlew runClient
 ```
-*(Solicitará un nickname único e iniciará la consola interactiva)*
+*(El cliente solicitará ingresar un nickname único. Si el nickname está en uso, el servidor rechazará la conexión con la excepción Slice `NicknameInUseException` solicitando un nuevo intento)*.
 
 ---
 
-## 4. Manual de Comandos de la Interfaz (CLI)
+## 3. Manual de Comandos de la Interfaz (CLI)
 
-### Módulo 1 & 2 (Presencia y Mensajería Directa):
-- `/users` : Lista los usuarios conectados en tiempo real.
-- `/msg <usuario> <mensaje>` : Envía un mensaje privado 1 a 1.
-- `/logout` o `/exit` : Cierra sesión y libera los recursos en el servidor.
-- `/help` : Muestra el catálogo de comandos disponibles.
+### Módulo 1 & 2: Gestión de Sesión, Presencia y Chat Directo
+- `/users` : Consulta y lista los usuarios conectados en tiempo real.
+- `/msg <usuario> <mensaje>` : Envía un mensaje de texto privado (1 a 1) al usuario especificado.
+- `/logout` o `/exit` : Realiza un cierre de sesión ordenado, liberando proxies y notificando a la red.
+- `/help` : Despliega el catálogo interactivo de comandos disponibles.
 
-### Módulo 3 & 4 (Salas de Chat y Archivos):
-- `/create <sala>` : Crea una nueva sala de conversación.
-- `/rooms` : Lista las salas de chat activas en el servidor.
-- `/join <sala>` : Se suscribe a una sala.
-- `/leave <sala>` : Abandona una sala.
-- `/roommsg <sala> <mensaje>` : Envía un mensaje a todos los integrantes de la sala.
-- `/sendfile <destinatario/sala> <ruta_archivo>` : Transfiere un archivo fragmentado en chunks de 32/64 KB.
+### Módulo 3 & 4: Salas de Chat y Transferencia Multimedia (Chunking)
+- `/create <sala>` : Crea dinámicamente una nueva sala grupal.
+- `/rooms` : Lista las salas de chat activas en el sistema.
+- `/join <sala>` : Se suscribe e ingresa a una sala.
+- `/leave <sala>` : Abandona la sala de chat.
+- `/roommsg <sala> <mensaje>` : Difunde un mensaje a todos los participantes inscritos en la sala (sin eco ni duplicado al remitente).
+- `/sendfile <usuario|#sala> <ruta_archivo>` : Transfiere un archivo binario (imágenes, audios `.wav`, `.mp3`, `.pdf`, `.txt`) fragmentado en chunks de 64 KB vía Ice.
+  - Ejemplo usuario directo: `/sendfile maria "C:\fotos\paisaje.jpg"`
+  - Ejemplo sala grupal: `/sendfile #general C:\documentos\informe.pdf`
+  - *Los archivos recibidos se ensamblan íntegramente y se almacenan automáticamente en la carpeta local `downloads/`.*
 
-### Módulo 5 & 6 (Llamadas de Voz UDP):
-- `/call <usuario>` : Inicia una solicitud de llamada de voz 1 a 1.
-- `/accept` : Acepta la llamada entrante y abre la captura/reproducción de audio UDP.
-- `/reject` : Rechaza la llamada entrante.
-- `/hangup` : Finaliza la llamada y cierra los sockets UDP.
-- `/mute` / `/unmute` : Silencia o reactiva el micrófono.
-- `/voicejoin <sala>` : Se une a la sala de voz grupal sobre UDP.
-- `/voiceleave` : Abandona la sala de voz grupal.
+### Módulo 5 & 6: Llamadas de Voz UDP (Directas y Grupales)
+- `/call <usuario>` : Solicita una llamada de voz 1 a 1 al usuario destino.
+- `/accept` : Acepta una llamada entrante, negociando los endpoints UDP y activando el audio en tiempo real.
+- `/reject` : Rechaza la llamada entrante notificando la razón al llamador.
+- `/hangup` : Finaliza la llamada de voz activa y cierra los recursos de red/audio.
+- `/mute` : Silencia la captura del micrófono (deja de transmitir paquetes UDP).
+- `/unmute` : Reactiva la transmisión del micrófono.
+- `/voicejoin <sala>` : Se une a la conferencia de voz grupal UDP de la sala (topología Mesh).
+- `/voiceleave` : Abandona la conferencia de voz grupal sin interrumpir la llamada de los demás participantes.
 
 ---
 
-## 5. Cuestionario de Análisis Conceptual y Decisiones de Diseño
+## 4. Cuestionario de Análisis Conceptual y Decisiones de Diseño
 
 ### 1. Arquitectura Híbrida TCP/UDP
-- **Razones Técnicas:** ZeroC Ice opera sobre TCP, garantizando entrega confiable, orden estricto de invocaciones RPC y detección de fallos de red. Esto es ideal para control de sesión, texto y archivos, donde la pérdida de un solo byte causaría corrupción o inconsistencia. Por el contrario, el audio en tiempo real es altamente sensible a la latencia y al retardo temporal, pero tolerante a pequeñas pérdidas aisladas de paquetes.
-- **Consecuencias si la voz fuera sobre TCP:** Si se usara TCP bajo condiciones de jitter o pérdida de paquetes, los mecanismos de retransmisión (ARQ) y control de congestión de TCP congelarían el flujo (Head-of-Line Blocking), generando silencios prolongados ("buffering"), retraso acumulativo severo y un audio entrecortado e ininteligible. UDP descarta paquetes rezagados inmediatamente, manteniendo la fluidez y baja latencia.
+- **Razones Técnicas:** ZeroC Ice opera sobre TCP, garantizando confiabilidad punto a punto mediante control de flujo, retransmisión de paquetes perdidos (ARQ) y entrega estrictamente ordenada. Esto es indispensable para la señalización, autenticación, mensajería y transferencia de archivos, donde la alteración o pérdida de un único byte corrompería la lógica de negocio o la integridad de los archivos. En contraste, la voz en tiempo real es extremadamente sensible a la latencia (retardo < 150 ms) y al jitter, pero cuenta con una alta tolerancia a pérdidas aisladas de paquetes (1-3%).
+- **Consecuencias si la voz se transmitiera sobre Ice/TCP:** Bajo condiciones de fluctuación de red (*jitter*) o congestión con pérdida de datagramas, el protocolo TCP detendría el consumo del búfer receptor a la espera de la retransmisión del paquete rezagado (**Head-of-Line Blocking**). Esto ocasionaría silencios prolongados (buffering), un retardo temporal acumulativo severo y un audio entrecortado e ininteligible, arruinando la interactividad natural de una llamada. UDP descarta paquetes obsoletos inmediatamente, manteniendo la conversación fluida y en tiempo real.
 
 ### 2. Manejo de Buffer y Chunking en Ice
-- **Comportamiento por defecto:** Si se intenta transferir un archivo de 80 MB en una sola llamada pasando un `sequence<byte>`, ZeroC Ice arrojará la excepción `com.zeroc.Ice.MemoryLimitException`. Esto ocurre porque por defecto Ice impone un límite de tamaño de mensaje (`Ice.MessageSizeMax = 1024` KB = 1 MB).
-- **Solución por Fragmentación (Chunking):** Fragmentar el archivo en bloques sucesivos (e.g. 32 KB a 64 KB) con metadatos asociados (`fileId`, `chunkIndex`, `totalChunks`, `totalSize`) garantiza que cada mensaje RPC esté muy por debajo del umbral de memoria. El receptor reconstruye el stream secuencialmente en disco, evitando agotar la memoria heap de la JVM.
+- **Comportamiento por defecto:** Si un cliente intenta transferir un video de 80 MB en una única invocación RPC pasando toda la secuencia binaria en un `sequence<byte>`, ZeroC Ice arrojará la excepción de tiempo de ejecución:
+  ```text
+  com.zeroc.Ice.MemoryLimitException
+  ```
+  Esto se debe a que por defecto Ice impone una restricción de seguridad en el tamaño máximo del búfer de serialización por mensaje (`Ice.MessageSizeMax = 1024` KB = 1 MB) para evitar ataques de denegación de servicio (DoS) por agotamiento de heap en la JVM.
+- **Solución por Fragmentación (Chunking):** La técnica de fragmentación divide el archivo en bloques o *chunks* sucesivos de 64 KB, encapsulados en la estructura `FileChunk` con sus respectivos metadatos (`fileId`, `fileName`, `totalSize`, `chunkIndex`, `totalChunks`, `data`). Cada llamada RPC se mantiene muy por debajo del umbral de 1 MB. En el cliente receptor, un descriptor de archivo (`RandomAccessFile`) reconstruye el archivo en disco indexando cada bloque según `chunkIndex * CHUNK_SIZE`, garantizando total consistencia e integridad binaria sin desbordar la memoria RAM.
 
-### 3. Escalabilidad en Llamadas Grupales (Relay SFU vs. Mesh P2P)
-Si una sala cuenta con $N$ participantes activos hablando simultáneamente:
-- **Topología Mesh Peer-to-Peer:**
-  - Cada cliente emite $N - 1$ réplicas de cada paquete UDP (uno para cada compañero).
-  - Carga de ancho de banda por cliente: $O(N)$ de subida.
-  - Carga en el servidor: $0$ paquetes (el servidor solo hace la señalización Ice inicial).
-  - *Desventaja:* No escala en clientes con conexiones domésticas de subida limitada cuando $N > 4$.
-- **Topología Audio Relay Centralizado (SFU Ligero):**
-  - Cada cliente emite exactamente **1** paquete UDP hacia el servidor ($O(1)$ de subida por cliente).
-  - El servidor recibe $N$ paquetes por instante y los retransmite a los otros $N - 1$ participantes, soportando una carga total de $N \times (N - 1)$ paquetes ($O(N^2)$ en el servidor).
-  - *Ventaja:* Ahorra ancho de banda de subida al cliente, ideal para entornos cliente convencionales.
+### 3. Escalabilidad en Llamadas Grupales (Relay SFU vs. Mesh Peer-to-Peer)
+En un escenario donde una sala cuenta con $N$ participantes activos hablando concurrentemente:
+
+| Métrica / Parámetro | Topología Mesh Peer-to-Peer (Implementada) | Topología Audio Relay SFU (Servidor Central) |
+| :--- | :---: | :---: |
+| **Paquetes emitidos por cada cliente** | $N - 1$ paquetes por instante ($O(N)$) | Exactamente **1** paquete hacia el servidor ($O(1)$) |
+| **Ancho de banda de subida (Upload)** | Crece linealmente con cada nuevo miembro | Constante por cliente, ideal para conexiones domésticas |
+| **Carga de paquetes en la red del Servidor** | **0 paquetes** (Carga nula en servidor) | $N \times (N - 1)$ paquetes redistribuidos ($O(N^2)$) |
+| **Latencia acústica entre pares** | Mínima (transmisión directa host-a-host) | Ligeramente mayor (salto intermedio en el servidor) |
+| **Justificación de la elección del equipo** | El equipo eligió **Mesh P2P** porque minimiza el costo computacional y el ancho de banda del servidor Ice, permitiendo que la máquina servidora se dedique exclusivamente a despachar eventos RPC con alta disponibilidad. |
 
 ### 4. Transparencia y Callbacks en Ice
-- **Ciclo de vida y Object Adapters en el Cliente:** Para que el servidor invoque métodos de retorno, el cliente debe comportarse temporalmente como un servidor local: crea un `ObjectAdapter` local (generalmente en un puerto efímero asignado por el SO), instancia el servant (`ClientCallbackI`), lo registra en el adaptador y lo activa (`adapter.activate()`). Luego, obtiene un proxy a su servant y se lo entrega al servidor en el método `login()`.
+- **Ciclo de vida y Object Adapters en el Cliente:** Para que el servidor invoque métodos de retorno (callbacks asíncronos) sobre el cliente, éste debe alojar un microservidor local. El cliente crea un `ObjectAdapter` (`communicator.createObjectAdapterWithEndpoints("ClientCallbackAdapter", "default -h 0.0.0.0 -p 0")`) en un puerto efímero asignado por el sistema operativo. Luego instancia la clase servant (`ClientCallbackI`), la registra en el adaptador asociándole una identidad única (`ClientCallback-<UUID>`) y activa el adaptador (`adapter.activate()`). Finalmente, obtiene un proxy a su servant (`ClientCallbackPrx`) y lo envía como parámetro al servidor en la invocación `server.login(nickname, callbackPrx)`.
 - **Proxies Directos vs. Indirectos:**
-  - *Proxy Directo:* Contiene la dirección de red explícita del nodo (host y puerto, ej. `ClientCallback:tcp -h 192.168.1.15 -p 54321`). Es el empleado en callbacks para que el servidor despache inmediatamente sin requerir servicios de localización.
-  - *Proxy Indirecto:* Contiene únicamente el identificador y el nombre de un adaptador registrado en un servicio de localización (`IceGrid`), permitiendo balanceo de carga y tolerancia a fallos a nivel de clúster.
+  - **Proxy Directo:** Contiene la dirección física explícita de transporte del objeto remoto (protocolo, host y puerto, ej. `ClientCallback-123:tcp -h 192.168.1.20 -p 52341`). Es el empleado en los callbacks para que el servidor despache inmediatamente invocaciones al cliente sin consultar a un intermediario.
+  - **Proxy Indirecto:** No especifica host ni puerto físicos, sino un identificador de objeto y un nombre de adaptador (o id de réplica) registrado en un servicio de localización y despliegue como **IceGrid**. IceGrid resuelve dinámicamente los endpoints reales, permitiendo balanceo de carga, activación bajo demanda y tolerancia a fallos.
 
 ---
 
-## 6. Bitácora de Uso Ético de IAG (Nivel 3 - Colaboración Asistida)
+## 5. Bitácora de Uso Ético de IAG (Nivel 3 - Colaboración Asistida)
 
 - **Prompts Principales Empleados:**
-  1. *"Diagnosticar y corregir la estructura inicial de Gradle y contratos Slice para que cumpla los lineamientos de la Universidad Icesi."*
-  2. *"Definir una división equitativa de 3 roles técnicos para estudiantes de 5to semestre que cubra la totalidad de la rúbrica evaluativa."*
-  3. *"Generar la base del servant `ChatServerI` y `ClientCallbackI` con Thread-Safety (ConcurrentHashMap) y CLI desacoplada para RF-01 y RF-02."*
-- **Adaptaciones Críticas Realizadas:**
-  - Sustitución de configuraciones rígidas de Gradle por la integración moderna de `com.zeroc.slice-tools` y sincronización automática de contratos `.ice`.
-  - Simplificación del manejo de hilos y colecciones a estándares idiomáticos de 5to semestre (`ConcurrentHashMap` y `Scanner` en hilo desacoplado) sin recurrir a frameworks innecesariamente densos.
+  1. *"Diagnosticar y adaptar la configuración de Gradle multimodular con el plugin oficial de ZeroC Ice y tareas independientes `runServer` y `runClient`."*
+  2. *"Diseñar el contrato Slice (`Chat.ice`) fuertemente tipado con interfaces, estructuras para fragmentación de archivos y excepciones de dominio."*
+  3. *"Estructurar el gestor de fragmentación de archivos `FileTransferManager` con bloques de 64 KB y reconstrucción aleatoria en disco (`RandomAccessFile`) evitando condiciones de carrera."*
+  4. *"Implementar el canal de audio en tiempo real con `DatagramSocket`, captura PCM a 16 kHz y topología Mesh UDP con filtrado de endpoints."*
+
+- **Adaptaciones Críticas Realizadas por el Equipo:**
+  - **Reconstrucción segura de archivos:** Se adaptó el receptor para utilizar `RandomAccessFile` posicionado por offsets para que la reconstrucción no dependa del orden de llegada de los chunks y se evitaran corrupciones en archivos de varios megabytes.
+  - **Resiliencia en hardware de audio:** Se refactorizó la inicialización de `UploadAudioManager` para que, en caso de ausencia de dispositivo de captura de micrófono en el laboratorio, el cliente entre limpiamente en modo "solo escucha" en lugar de fallar con excepción.
+  - **Resolución dinámica de red:** Se incorporó detección de interfaces de red activas en `localIp()` para descartar interfaces virtuales (como WSL o Hyper-V) y garantizar la conectividad de los datagramas UDP en la red local.
+
 - **Lecciones Aprendidas:**
-  - El comportamiento del compilador Slice frente a los límites de memoria (`Ice.MessageSizeMax`) y la necesidad estricta del chunking binario.
-  - La diferencia operativa fundamental entre el modelo transaccional y ordenado de TCP frente a la naturaleza sin conexión y de mínima latencia de los datagramas UDP para audio.
+  - El impacto de las restricciones de buffer (`Ice.MessageSizeMax`) en arquitecturas middleware y la conveniencia de aplicar el patrón de fragmentación secuencial.
+  - La complementariedad entre los protocolos TCP (confiable y transaccional) y UDP (no orientado a conexión, sin retransmisión, baja latencia para streaming de voz).

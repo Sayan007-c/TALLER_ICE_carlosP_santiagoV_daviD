@@ -8,13 +8,16 @@ public class ClientCallbackI implements ClientCallback {
 
     private final String clientUsername;
     private final VoiceController voice;
+    private final FileTransferManager fileManager;
 
     public ClientCallbackI(
             String clientUsername,
-            VoiceController voice) {
+            VoiceController voice,
+            FileTransferManager fileManager) {
 
         this.clientUsername = clientUsername;
         this.voice = voice;
+        this.fileManager = fileManager;
     }
 
     // RF-01: Presencia de usuarios.
@@ -71,15 +74,15 @@ public class ClientCallbackI implements ClientCallback {
             FileChunk chunk,
             Current current) {
 
-        // Pendiente: reconstruccion de archivos
-        // correspondiente al Integrante 2.
-
         System.out.println(
-                "[ARCHIVO PRIVADO] @"
+                "\n[ARCHIVO PRIVADO] @"
                         + fromUser + " bloque "
                         + (chunk.chunkIndex + 1)
                         + "/" + chunk.totalChunks
                         + " de " + chunk.fileName);
+        System.out.print("> ");
+
+        fileManager.processIncomingChunk(fromUser, chunk, false);
     }
 
     // RF-04: Archivos en salas.
@@ -90,13 +93,15 @@ public class ClientCallbackI implements ClientCallback {
             FileChunk chunk,
             Current current) {
 
-        // Pendiente: reconstruccion del archivo.
-
         System.out.println(
-                "[ARCHIVO SALA #" + roomName
+                "\n[ARCHIVO SALA #" + roomName
                         + "] @" + fromUser
                         + " bloque " + (chunk.chunkIndex + 1)
-                        + "/" + chunk.totalChunks);
+                        + "/" + chunk.totalChunks
+                        + " de " + chunk.fileName);
+        System.out.print("> ");
+
+        fileManager.processIncomingChunk(roomName, chunk, true);
     }
 
     // RF-05: Llamada entrante.

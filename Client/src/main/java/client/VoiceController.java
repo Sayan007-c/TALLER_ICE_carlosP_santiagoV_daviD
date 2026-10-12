@@ -35,10 +35,27 @@ public final class VoiceController implements AutoCloseable {
     public String localIp() throws Exception {
 
         String configured = System.getenv("VOICE_IP");
+        if (configured != null && !configured.isBlank()) {
+            return configured.trim();
+        }
 
-        return configured != null && !configured.isBlank()
-                ? configured
-                : InetAddress.getLocalHost().getHostAddress();
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface ni = interfaces.nextElement();
+                if (ni.isLoopback() || !ni.isUp()) continue;
+                java.util.Enumeration<InetAddress> addresses = ni.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr instanceof java.net.Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return InetAddress.getLocalHost().getHostAddress();
     }
 
     private boolean busy() {

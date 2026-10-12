@@ -312,8 +312,15 @@ public class ChatServerI implements ChatServer {
                     "Destinatario no disponible");
         }
 
-        target.onPrivateFileChunkReceived(
-                fromUser, chunk);
+        try {
+            target.onPrivateFileChunkReceived(
+                    fromUser, chunk);
+        } catch (Exception e) {
+            activeUsers.remove(toUser);
+            notifyUserPresence(toUser, false);
+            throw new UserNotFoundException(
+                    "El destinatario se desconecto durante la transferencia");
+        }
     }
 
     // RF-04: Enviar fragmento a sala.
@@ -330,6 +337,11 @@ public class ChatServerI implements ChatServer {
         if (room == null) {
             throw new RoomNotFoundException(
                     "Sala no encontrada");
+        }
+
+        if (!room.containsKey(fromUser)) {
+            throw new RoomNotFoundException(
+                    "No perteneces a la sala");
         }
 
         for (Map.Entry<String, ClientCallbackPrx> member

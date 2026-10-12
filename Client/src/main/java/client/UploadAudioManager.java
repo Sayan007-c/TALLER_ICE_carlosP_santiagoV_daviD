@@ -68,34 +68,36 @@ public  final class UploadAudioManager implements AutoCloseable {
         return muted;
     }
 
-    public synchronized void start()
-            throws LineUnavailableException {
+    public synchronized void start() {
 
         if (running) return;
 
-        DataLine.Info in = new DataLine.Info(
-                TargetDataLine.class, FORMAT);
-
-        DataLine.Info out = new DataLine.Info(
-                SourceDataLine.class, FORMAT);
-
-        TargetDataLine newMic =
-                (TargetDataLine) AudioSystem.getLine(in);
-
-        SourceDataLine newSpeaker =
-                (SourceDataLine) AudioSystem.getLine(out);
-
+        TargetDataLine newMic = null;
         try {
-            newMic.open(FORMAT);
-            newSpeaker.open(FORMAT);
+            DataLine.Info in = new DataLine.Info(
+                    TargetDataLine.class, FORMAT);
+            if (AudioSystem.isLineSupported(in)) {
+                newMic = (TargetDataLine) AudioSystem.getLine(in);
+                newMic.open(FORMAT);
+                newMic.start();
+            }
+        } catch (Exception e) {
+            System.err.println("[AUDIO AVISO] Microfono no disponible: " + e.getMessage() + ". Entrando en modo solo escucha.");
+            newMic = null;
+        }
 
-            newMic.start();
-            newSpeaker.start();
-
-        } catch (LineUnavailableException | RuntimeException e) {
-            newMic.close();
-            newSpeaker.close();
-            throw e;
+        SourceDataLine newSpeaker = null;
+        try {
+            DataLine.Info out = new DataLine.Info(
+                    SourceDataLine.class, FORMAT);
+            if (AudioSystem.isLineSupported(out)) {
+                newSpeaker = (SourceDataLine) AudioSystem.getLine(out);
+                newSpeaker.open(FORMAT);
+                newSpeaker.start();
+            }
+        } catch (Exception e) {
+            System.err.println("[AUDIO AVISO] Altavoz no disponible: " + e.getMessage());
+            newSpeaker = null;
         }
 
         mic = newMic;
@@ -173,11 +175,12 @@ public  final class UploadAudioManager implements AutoCloseable {
 
                 boolean accepted = peers.values()
                         .stream()
-                        .anyMatch(peer ->
-                                peer.getAddress().equals(
-                                        packet.getAddress())
-                                        && peer.getPort()
-                                        == packet.getPort());
+                        .anyMatch(peer -> {
+                            boolean ipMatches = peer.getAddress().equals(packet.getAddress())
+                                    || (peer.getAddress().isLoopbackAddress() && packet.getAddress().isLoopbackAddress())
+                                    || peer.getAddress().getHostAddress().equals(packet.getAddress().getHostAddress());
+                            return ipMatches && peer.getPort() == packet.getPort();
+                        });
 
                 SourceDataLine output = speaker;
 
